@@ -1,257 +1,95 @@
-import os
-import threading
-import time
-import tkinter.messagebox
 from tkinter import *
-from tkinter import filedialog
-
-from tkinter import ttk
-from ttkthemes import themed_tk as tk
-
-from mutagen.mp3 import MP3
 from pygame import mixer
+from tkinter import messagebox
+from tkinter import filedialog
+import os
+import pause
 
-root = tk.ThemedTk()
-root.get_themes()                 # Returns a list of all themes that can be set
-root.set_theme("radiance")         # Sets an available theme
+root = Tk()
+root.geometry('300x350')
 
-# Fonts - Arial (corresponds to Helvetica), Courier New (Courier), Comic Sans MS, Fixedsys,
-# MS Sans Serif, MS Serif, Symbol, System, Times New Roman (Times), and Verdana
-#
-# Styles - normal, bold, roman, italic, underline, and overstrike.
 
-statusbar = ttk.Label(root, text="Welcome to Melody", relief=SUNKEN, anchor=W, font='Times 10 italic')
-statusbar.pack(side=BOTTOM, fill=X)
+mixer.init()  ## initializing the mixer
 
-# Create the menubar
+
+
+### Functions ####
+def play_music():
+    if pause.paused == False:
+        try:
+            mixer.music.load(file_path)
+            mixer.music.play()
+            status_bar['text'] = "Playing..." + os.path.basename(file_path) ## show filename in the status_bar
+        except:
+            messagebox.showerror("Error","File Not Found, Please Open!")
+    elif pause.paused == True:
+        mixer.music.unpause()
+        status_bar['text'] = "Playing..." + os.path.basename(file_path)
+        
+def pause_music():
+    pause.paused = True
+    mixer.music.pause()
+    status_bar['text'] = "Paused..." + os.path.basename(file_path)
+   
+def stop_music():
+    pause.paused = False
+    mixer.music.stop()  ## Stop playing the file
+    status_bar['text'] = os.path.basename(file_path)
+        
+def set_vol(val):
+    volume = int(val) / 100 ## set_volume of mixer takes only values between 0 and 1
+    mixer.music.set_volume(volume)
+    
+
+def open_file():
+    global file_path
+    file = filedialog.askopenfile(title="Open Song",filetypes=(("Mp3 Songs","*.mp3"),("All Files","*.*")))
+    file_path = file.name
+    
+def about_cmd():
+    messagebox.showinfo("About Us","Music Player Powered By Modar Zeneh")
+
+######### Widggets ################### 
+
+## Create an image Buttons ## 
+img_play = PhotoImage(file="play.png")
+img_stop = PhotoImage(file="stop.png")
+img_pause = PhotoImage(file="pause.png")
+
+## Create Buttons ##
+btn_play = Button(root,image=img_play,command=play_music)
+btn_play.pack(pady=5)
+btn_stop = Button(root,image=img_stop,command=stop_music)
+btn_stop.pack(pady=5)
+btn_pause = Button(root,image=img_pause,command=pause_music)
+btn_pause.pack(pady=5)
+
+## Create Scale ##
+scale = Scale(root,from_=0,to=100,orient=HORIZONTAL,width=20,command=set_vol)
+scale.set(50) ## Set the default value of the scale to 50%
+mixer.music.set_volume(0.5)
+scale.pack(pady=5)
+
+### Create the Menubar ###
 menubar = Menu(root)
 root.config(menu=menubar)
+## Create the submenus ##
+menu_file = Menu(menubar)
+menu_help = Menu(menubar)
+menu_file.add_command(label="Open File",command=open_file)
+menu_file.add_command(label="Exit",command=root.destroy)
+menu_help.add_command(label="About",command=about_cmd)
 
-# Create the submenu
+menubar.add_cascade(label="File",menu=menu_file)
+menubar.add_cascade(label="Help",menu=menu_help)
 
-subMenu = Menu(menubar, tearoff=0)
+## Create a Status Bar ###
+status_bar =  Label(root,text="Welcome To Melody",relief='sunken')
+status_bar.pack(side=BOTTOM,fill=X)
 
-playlist = []
 
 
-# playlist - contains the full path + filename
-# playlistbox - contains just the filename
-# Fullpath + filename is required to play the music inside play_music load function
 
-def browse_file():
-    global filename_path
-    filename_path = filedialog.askopenfilename()
-    add_to_playlist(filename_path)
 
-    mixer.music.queue(filename_path)
-
-
-def add_to_playlist(filename):
-    filename = os.path.basename(filename)
-    index = 0
-    playlistbox.insert(index, filename)
-    playlist.insert(index, filename_path)
-    index += 1
-
-
-menubar.add_cascade(label="File", menu=subMenu)
-subMenu.add_command(label="Open", command=browse_file)
-subMenu.add_command(label="Exit", command=root.destroy)
-
-
-def about_us():
-    tkinter.messagebox.showinfo('About Melody', 'This is a music player build using Python Tkinter by @attreyabhatt')
-
-
-subMenu = Menu(menubar, tearoff=0)
-menubar.add_cascade(label="Help", menu=subMenu)
-subMenu.add_command(label="About Us", command=about_us)
-
-mixer.init()  # initializing the mixer
-
-root.title("Melody")
-root.iconbitmap(r'images/melody.ico')
-
-# Root Window - StatusBar, LeftFrame, RightFrame
-# LeftFrame - The listbox (playlist)
-# RightFrame - TopFrame,MiddleFrame and the BottomFrame
-
-leftframe = Frame(root)
-leftframe.pack(side=LEFT, padx=30, pady=30)
-
-playlistbox = Listbox(leftframe)
-playlistbox.pack()
-
-addBtn = ttk.Button(leftframe, text="+ Add", command=browse_file)
-addBtn.pack(side=LEFT)
-
-
-def del_song():
-    selected_song = playlistbox.curselection()
-    selected_song = int(selected_song[0])
-    playlistbox.delete(selected_song)
-    playlist.pop(selected_song)
-
-
-delBtn = ttk.Button(leftframe, text="- Del", command=del_song)
-delBtn.pack(side=LEFT)
-
-rightframe = Frame(root)
-rightframe.pack(pady=30)
-
-topframe = Frame(rightframe)
-topframe.pack()
-
-lengthlabel = ttk.Label(topframe, text='Total Length : --:--')
-lengthlabel.pack(pady=5)
-
-currenttimelabel = ttk.Label(topframe, text='Current Time : --:--', relief=GROOVE)
-currenttimelabel.pack()
-
-
-def show_details(play_song):
-    file_data = os.path.splitext(play_song)
-
-    if file_data[1] == '.mp3':
-        audio = MP3(play_song)
-        total_length = audio.info.length
-    else:
-        a = mixer.Sound(play_song)
-        total_length = a.get_length()
-
-    # div - total_length/60, mod - total_length % 60
-    mins, secs = divmod(total_length, 60)
-    mins = round(mins)
-    secs = round(secs)
-    timeformat = '{:02d}:{:02d}'.format(mins, secs)
-    lengthlabel['text'] = "Total Length" + ' - ' + timeformat
-
-    t1 = threading.Thread(target=start_count, args=(total_length,))
-    t1.start()
-
-
-def start_count(t):
-    global paused
-    # mixer.music.get_busy(): - Returns FALSE when we press the stop button (music stop playing)
-    # Continue - Ignores all of the statements below it. We check if music is paused or not.
-    current_time = 0
-    while current_time <= t and mixer.music.get_busy():
-        if paused:
-            continue
-        else:
-            mins, secs = divmod(current_time, 60)
-            mins = round(mins)
-            secs = round(secs)
-            timeformat = '{:02d}:{:02d}'.format(mins, secs)
-            currenttimelabel['text'] = "Current Time" + ' - ' + timeformat
-            time.sleep(1)
-            current_time += 1
-
-
-def play_music():
-    global paused
-
-    if paused:
-        mixer.music.unpause()
-        statusbar['text'] = "Music Resumed"
-        paused = FALSE
-    else:
-        try:
-            stop_music()
-            time.sleep(1)
-            selected_song = playlistbox.curselection()
-            selected_song = int(selected_song[0])
-            play_it = playlist[selected_song]
-            mixer.music.load(play_it)
-            mixer.music.play()
-            statusbar['text'] = "Playing music" + ' - ' + os.path.basename(play_it)
-            show_details(play_it)
-        except:
-            tkinter.messagebox.showerror('File not found', 'Melody could not find the file. Please check again.')
-
-
-def stop_music():
-    mixer.music.stop()
-    statusbar['text'] = "Music Stopped"
-
-
-paused = FALSE
-
-
-def pause_music():
-    global paused
-    paused = TRUE
-    mixer.music.pause()
-    statusbar['text'] = "Music Paused"
-
-
-def rewind_music():
-    play_music()
-    statusbar['text'] = "Music Rewinded"
-
-
-def set_vol(val):
-    volume = float(val) / 100
-    mixer.music.set_volume(volume)
-    # set_volume of mixer takes value only from 0 to 1. Example - 0, 0.1,0.55,0.54.0.99,1
-
-
-muted = FALSE
-
-
-def mute_music():
-    global muted
-    if muted:  # Unmute the music
-        mixer.music.set_volume(0.7)
-        volumeBtn.configure(image=volumePhoto)
-        scale.set(70)
-        muted = FALSE
-    else:  # mute the music
-        mixer.music.set_volume(0)
-        volumeBtn.configure(image=mutePhoto)
-        scale.set(0)
-        muted = TRUE
-
-
-middleframe = Frame(rightframe)
-middleframe.pack(pady=30, padx=30)
-
-playPhoto = PhotoImage(file='images/play.png')
-playBtn = ttk.Button(middleframe, image=playPhoto, command=play_music)
-playBtn.grid(row=0, column=0, padx=10)
-
-stopPhoto = PhotoImage(file='images/stop.png')
-stopBtn = ttk.Button(middleframe, image=stopPhoto, command=stop_music)
-stopBtn.grid(row=0, column=1, padx=10)
-
-pausePhoto = PhotoImage(file='images/pause.png')
-pauseBtn = ttk.Button(middleframe, image=pausePhoto, command=pause_music)
-pauseBtn.grid(row=0, column=2, padx=10)
-
-# Bottom Frame for volume, rewind, mute etc.
-
-bottomframe = Frame(rightframe)
-bottomframe.pack()
-
-rewindPhoto = PhotoImage(file='images/rewind.png')
-rewindBtn = ttk.Button(bottomframe, image=rewindPhoto, command=rewind_music)
-rewindBtn.grid(row=0, column=0)
-
-mutePhoto = PhotoImage(file='images/mute.png')
-volumePhoto = PhotoImage(file='images/volume.png')
-volumeBtn = ttk.Button(bottomframe, image=volumePhoto, command=mute_music)
-volumeBtn.grid(row=0, column=1)
-
-scale = ttk.Scale(bottomframe, from_=0, to=100, orient=HORIZONTAL, command=set_vol)
-scale.set(70)  # implement the default value of scale when music player starts
-mixer.music.set_volume(0.7)
-scale.grid(row=0, column=2, pady=15, padx=30)
-
-
-def on_closing():
-    stop_music()
-    root.destroy()
-
-
-root.protocol("WM_DELETE_WINDOW", on_closing)
 root.mainloop()
+
